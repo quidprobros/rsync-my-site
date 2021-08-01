@@ -379,10 +379,6 @@ function init() {
 
     case $cmd in
         up|run|start)
-            info hi
-            warn molly
-            exit
-
             run "${extra_args[@]}"
             return
             ;;
