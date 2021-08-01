@@ -4,7 +4,6 @@
 #env
 #exit
 err() {
-    #echo "Error $1 occurred on $2"
     echo "err(${1}) on line $(caller)" >&2
     exit "${1}"
 }
@@ -17,12 +16,11 @@ hangup() {
 }
 trap 'hangup $?' SIGINT
 
-: $(( quiet = 0 ))
-: $(( quieter = 1 ))
+quiet=0
+quieter=1
 # test for -s to strip newline
-info() { (( quieter )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
-warn() { (( quiet )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
-
+info() { [[ "$quiet" -eq 0 ]] && ([ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*") ; return 0;}
+warn() {  [[ "$quieter" -eq 0 ]] && ([ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*") ; return 0;}
 
 elementInArray() {
     declare -n array="${1}"
@@ -68,7 +66,7 @@ handlePkgParseResponse() {
             tput sgr0
             return
             ;;
-        3|4)2M
+        3|4)
             warn "Warning(${code}) parsing ${property}"$'\n'
             warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.\n'
             tput sgr0
@@ -95,7 +93,7 @@ connectionTest() {
     if ssh -q "${1}" exit
     then
         tput bold
-        info $'success\n\n'
+        info -v $'success\n\n'
         tput sgr0
         return
     fi
@@ -304,7 +302,9 @@ run() {
     fi
     tput sgr0
 
-    info 'If everything looks good, select option 1 to start the process:'
+    printf 'Select option 1 to start synchronization'
+    if elementInArray extra_args '--dry-run'; then printf ' (dry run)'; else printf ' (live)'; fi
+    printf ':\n'
     select yn in "continue" "quit"
     do
         case $yn in
