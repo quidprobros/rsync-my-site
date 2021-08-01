@@ -134,11 +134,11 @@ commands:
   help               display this stuff
 
 options:
-  -t| --test     run in test mode, use --dry-run and --verbose with rsync
-  -d| --delete   delete remote files, use --delete and --delete-excluded with rsync
+  -t| --test      run in test mode, use --dry-run and --verbose with rsync
+  -d| --delete    delete remote files, use --delete and --delete-excluded with rsync
 
-  -q| --quiet)  silence info messages and warning messages
-  -v)           show info and warning messages
+  -q| --quiet)    silence info messages and warning messages
+  -v) --verbose)  show info and warning messages
 
 Futher reading:
   For more detail on how to use this script, see readme.
