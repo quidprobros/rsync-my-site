@@ -151,7 +151,6 @@ prep() {
     checkForPkgJson || return 1
 }
 
-
 declare -a extra_args=()
 
 run() {
@@ -192,7 +191,7 @@ run() {
 
     info 'File source:'$'\n  '"${config[ssh_local_root]}" $'\n\n'
     info 'Target destination:'$'\n  '"${ssh_target}"$'\n\n'
-    exit
+
     # base-level exclusions (can extend)
     declare -a exclusions=(
         ".DS_Store"
@@ -277,13 +276,11 @@ run() {
         info "  ${inclusions[*]}"$'\n\n'
     fi
 
-    info 'Filtered ...\n'
-    info '  %s\n' "${protection_and_perish[@]}"
-    info '\n'
+    info 'Filtered ...'
+    IFS=$'\n' info "${protection_and_perish[@]}"
 
-    printf 'Exclusions ...\n'
-    printf '  %s\n' "${exclusions[@]}"
-    printf '\n'
+    info 'Exclusions ...'
+    IFS=$'\n' info "${exclusions[@]}"
 
     tput bold
     tput smul
@@ -316,9 +313,9 @@ run() {
         esac
     done
 
-    info 'Starting ... '$'\n'
+    info 'Starting ... '
     (
-        rsync -e '/usr/bin/ssh -T -x' "${extra_args_final[@]//}" \
+        rsync -e '/usr/bin/ssh -T -x' ${extra_args_final[@]} \
               --compress \
               --recursive \
               --protect-args \
