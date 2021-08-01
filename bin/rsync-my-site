@@ -18,10 +18,11 @@ hangup() {
 trap 'hangup $?' SIGINT
 
 : $(( quiet = 0 ))
-: $(( quiet2 = 0 ))
+: $(( quieter = 1 ))
 # test for -s to strip newline
-info() { (( quiet )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
-warn() { (( quiet2 )) || printf %s\\n "$*"; }
+info() { (( quieter )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
+warn() { (( quiet )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
+
 
 elementInArray() {
     declare -n array="${1}"
@@ -35,11 +36,11 @@ elementInArray() {
 
 checkForPkgJson() {
     if [ -f ./package.json ]; then
-        info "Reading config from ${PWD}/package.json"$'\n'$'\n'
+        info "Reading config from ${PWD}/package.json"$'\n'
         :
     else
         tput bold
-        warn '  Warning: package.json not found!$\n\n'
+        warn ' * Warning: package.json not found!'
         tput sgr0
         return 1
     fi
@@ -63,18 +64,18 @@ handlePkgParseResponse() {
     tput bold
     case "${code}" in
         1)
-            warn "Warning(${code}) is null ${property}"$'\n\n'
+            warn "Warning(${code}) is null ${property}"$'\n'
             tput sgr0
             return
             ;;
         3|4)2M
             warn "Warning(${code}) parsing ${property}"$'\n'
-            warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.\n\n'
+            warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.\n'
             tput sgr0
             return
             ;;
         5)
-            warn "Error(${code}) parsing ${property}"$'\n\n'
+            warn "Error(${code}) parsing ${property}"$'\n'
             tput sgr0
             return 1
             ;;
@@ -90,7 +91,7 @@ handlePkgParseResponse() {
 # test if Internet reachable
 connectionTest() {
     # test if port is open
-    info -v '  Testing SSH connection to remote host ... '
+    info -v 'Testing SSH connection to remote host ... '
     if ssh -q "${1}" exit
     then
         tput bold
@@ -136,7 +137,8 @@ options:
   -t| --test     run in test mode, use --dry-run and --verbose with rsync
   -d| --delete   delete remote files, use --delete and --delete-excluded with rsync
 
-  -s| --silent)  run with minimal verbosity
+  -q| --quiet)  silence info messages and warning messages
+  -v)           show info and warning messages
 
 Futher reading:
   For more detail on how to use this script, see readme.
@@ -358,8 +360,13 @@ function init() {
                     --delete-excluded
                 )
                 ;;
-            -s | --silent)
+            -v | --verbose)
+                quiet=0
+                quieter=0
+                ;;
+            -q | --quiet)
                 quiet=1
+                quieter=1
                 ;;
             *)
                 tput bold
@@ -372,6 +379,10 @@ function init() {
 
     case $cmd in
         up|run|start)
+            info hi
+            warn molly
+            exit
+
             run "${extra_args[@]}"
             return
             ;;
@@ -391,6 +402,7 @@ function init() {
             ;;
 
     esac
+
     return
 }
 rsync-my-site() {
