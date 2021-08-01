@@ -1,0 +1,409 @@
+#!/usr/bin/env bash
+#
+#echo $PWD
+#env
+#exit
+err() {
+    #echo "Error $1 occurred on $2"
+    echo "err(${1}) on line $(caller)" >&2
+    exit "${1}"
+}
+trap 'err $? $LINEO' ERR
+
+hangup() {
+    pkill -P $$
+    printf '\n\n User cancelled (killing spawned processes)\n'
+    exit "${1}"
+}
+trap 'hangup $?' SIGINT
+
+: $(( quiet = 0 ))
+: $(( quiet2 = 0 ))
+# test for -s to strip newline
+info() { (( quiet )) || [ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*" ;}
+warn() { (( quiet2 )) || printf %s\\n "$*"; }
+
+elementInArray() {
+    declare -n array="${1}"
+    local element="${2}"
+
+    if [[ "${array[*]}" =~ (^|[[:space:]])"${element}"($|[[:space:]]) ]]; then
+        return 0
+    fi
+    return 1
+}
+
+checkForPkgJson() {
+    if [ -f ./package.json ]; then
+        info "Reading config from ${PWD}/package.json"$'\n'$'\n'
+        :
+    else
+        tput bold
+        warn '  Warning: package.json not found!$\n\n'
+        tput sgr0
+        return 1
+    fi
+    return 0
+}
+
+checkForJQ() {
+    if ! command -v jq >/dev/null 2>&1
+    then
+        tput bold
+        printf '  %s is required\n  https://stedolan.github.io/jq/ \n' $'`jq`'
+        tput sgr0
+        return 1
+    fi
+    return 0
+}
+
+handlePkgParseResponse() {
+    local code="${1}"
+    local property="${2}"
+    tput bold
+    case "${code}" in
+        1)
+            warn "Warning(${code}) is null ${property}"$'\n\n'
+            tput sgr0
+            return
+            ;;
+        3|4)2M
+            warn "Warning(${code}) parsing ${property}"$'\n'
+            warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.\n\n'
+            tput sgr0
+            return
+            ;;
+        5)
+            warn "Error(${code}) parsing ${property}"$'\n\n'
+            tput sgr0
+            return 1
+            ;;
+        *)
+            warn "Error(${code}) parsing ${property}"$'\n'
+            warn ' * Not sure what to do!\n\n'
+            tput sgr0
+            return 1
+            ;;
+    esac
+}
+
+# test if Internet reachable
+connectionTest() {
+    # test if port is open
+    info -v '  Testing SSH connection to remote host ... '
+    if ssh -q "${1}" exit
+    then
+        tput bold
+        info $'success\n\n'
+        tput sgr0
+        return
+    fi
+    tput bold
+    info 'failed.\n'
+    info "  * Could not connect to ${ssh_target}"$'\n'
+    tput sgr0
+
+    info -v '  Checking Internet connection ... '
+    if ping -c 5 -o 8.8.8.8 >/dev/null 2>&1 &
+    then
+        :
+    else
+        info '  Internet is unreachable! Exiting ...\n\n'
+        return 1
+    fi
+    tput bold
+    info 'success!\n'
+    tput sgr0
+
+    return 1
+}
+
+help() {
+    cat <<'HEREDOC'
+rsync-my-site - commandline rsync wrapper for uploading websites
+
+Usage:  rsync-my-site <command> <options>
+
+  It is required that you add a package.json to your project's root directory.
+  See readme for configuration details.
+
+commands:
+  up| run | start    run rsync, using package.json.config and command options
+  down               put website in 'under construction' mode per user rules
+  help               display this stuff
+
+options:
+  -t| --test     run in test mode, use --dry-run and --verbose with rsync
+  -d| --delete   delete remote files, use --delete and --delete-excluded with rsync
+
+  -s| --silent)  run with minimal verbosity
+
+Futher reading:
+  For more detail on how to use this script, see readme.
+
+  To learn more about rsync, run `man rsync`.
+HEREDOC
+    return
+}
+
+prep() {
+    checkForJQ || return 1
+    checkForPkgJson || return 1
+}
+
+
+declare -a extra_args=()
+
+run() {
+    local extra_args_final="${*}"
+
+    # check some stuff
+    if ! prep;
+    then
+        exit
+    fi
+
+    # read file only once
+    package_json=$(<./package.json)
+
+    declare -A config=(
+        [ssh_alias]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_alias // empty')
+        [ssh_user]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_user // empty')
+        [ssh_domain]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_domain // empty')
+        [ssh_remote_root]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_remote_root // empty')
+        [ssh_local_root]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_local_root // empty')
+        [ssh_remote_port]=$(printf '%s' "${package_json}" | jq -r '.config.ssh_remote_port // empty')
+    )
+
+    # apply default port
+    : "${config[ssh_remote_port]:=22}"
+
+    # apply default CWD
+    : "${config[ssh_local_root]:=./}"
+
+    if [ -z "${config[ssh_alias]}" ]; then
+        declare -r ssh_target="${config[ssh_user]}@${config[ssh_domain]}"
+    else
+        declare -r ssh_target="${config[ssh_alias]}"
+    fi
+
+    declare -r ssh_target_full="${ssh_target}:${config[ssh_remote_root]}"
+    connectionTest "${ssh_target}" || return
+
+    info 'File source:'$'\n  '"${config[ssh_local_root]}" $'\n\n'
+    info 'Target destination:'$'\n  '"${ssh_target}"$'\n\n'
+    exit
+    # base-level exclusions (can extend)
+    declare -a exclusions=(
+        ".DS_Store"
+        "*#*"
+        "*~"
+    )
+
+    # error code is LOST when using declare for some reason
+    if _exclusions=$(printf '%s' "${package_json}" | jq --exit-status -r '.config.rsync_exclude_list[]? | @sh')
+    then
+        :
+    else
+        code="${?}"
+        handlePkgParseResponse "${code}" $'.config.rsync_exclude_list[]' || return
+    fi
+
+    for key in "${_exclusions[@]}"
+    do
+        exclusions+=("${key//\'/}")
+    done
+    unset key
+
+    # base-level protections (relative to remote root)
+    declare -a protection_and_perish=(
+        "-p .DS_Store"
+        "P /build"
+        "P /my-prefix"
+    )
+
+    if protections=$(printf '%s' "${package_json}" | jq -er '( "P " + .config.rsync_protect_and_perish_list.protect[]? ) | @sh')
+    then
+        :
+    else
+        code="${?}"
+        handlePkgParseResponse "${code}" $'.config.rsync_protect_and_perish_list.protect[]' | return
+    fi
+
+    for key in "${protections[@]}"
+    do
+        protection_and_perish+=("${key//\'/}")
+    done
+    unset key
+
+    if perishes=$(printf '%s' "${package_json}" | jq -er '("-p " + .config.rsync_protect_and_perish_list.perish[]?) | @sh')
+    then
+        :
+    else
+        code="${?}"
+        handlePkgParseResponse "${code}" $'.config.rsync_protect_and_perish_list.perish[]' | return
+    fi
+
+    for key in "${perishes[@]}"
+    do
+        protection_and_perish+=("${key//\'/}")
+    done
+    unset key
+
+    declare -a inclusions=(
+    )
+
+    if _inclusions=$(printf '%s' "${package_json}" | jq --exit-status -r '.config.rsync_include_list[]? | @sh')
+    then
+        :
+    else
+        code="${?}"
+        handlePkgParseResponse "${code}" $'.config.rsync_include_list[]' | return
+    fi
+
+    # allow expansion
+    for key in "${_inclusions[@]}"
+    do
+        inclusions+=("${key//\'/}")
+    done
+    unset key
+
+    info $'\n\n'
+
+    info 'Include list ...\n'
+    if [[ 0 -eq "${#inclusions[@]}" ]]; then
+        info '  !! No files from exclusion list will be uploaded !!\n\n'
+    else
+        info "  ${inclusions[*]}"$'\n\n'
+    fi
+
+    info 'Filtered ...\n'
+    info '  %s\n' "${protection_and_perish[@]}"
+    info '\n'
+
+    printf 'Exclusions ...\n'
+    printf '  %s\n' "${exclusions[@]}"
+    printf '\n'
+
+    tput bold
+    tput smul
+    if elementInArray extra_args '--dry-run' || elementInArray extra_args '-n'; then
+        info '!! THIS IS A DRY RUN !!'
+        if elementInArray extra_args '-d' || elementInArray extra_args '--delete'; then
+            info '!! REMOTE FILES *WOULD* BE DELETED PER RULES !!'
+        else
+            info '!! REMOTE FILES *WOULD NOT* BE DELETED !!'
+        fi
+    else
+        info '!! THIS IS A LIVE RUN !!'
+        if elementInArray extra_args '-d' || elementInArray extra_args '--delete'; then
+            info '!! REMOTE FILES *WILL* BE DELETED PER RULES !!'
+        else
+            tput smul
+            info '!! REMOTE FILES *WILL NOT* BE DELETED !!'
+        fi
+    fi
+    tput sgr0
+
+    info 'If everything looks good, select option 1 to start the process:'
+    select yn in "continue" "quit"
+    do
+        case $yn in
+            $'continue' ) break
+                  ;;
+            quit ) return
+                 ;;
+        esac
+    done
+
+    info 'Starting ... '$'\n'
+    (
+        rsync -e '/usr/bin/ssh -T -x' "${extra_args_final[@]//}" \
+              --compress \
+              --recursive \
+              --protect-args \
+              --include-from <(printf '%s\n' "${inclusions[@]}") \
+              --exclude-from <(printf '%s\n' "${exclusions[@]}") \
+              --filter='merge '<(printf '%s\n' "${protection_and_perish[@]}") \
+              --archive \
+              --progress \
+              --times \
+              --copy-links \
+              "${config[ssh_local_root]}" \
+              "${ssh_target_full?}"
+    ) &
+    wait $!
+}
+
+function init() {
+    local cmd="${1}"
+    local args=("${@}")
+    local param
+    if [[ 0 -eq ${#@} ]]; then
+        help
+        return
+    fi
+    set -- "${args[@]}"
+    shift
+    while [[ 0 -lt $# ]]; do
+        param="$1"
+        shift
+        case $param in
+            -t | --test)
+                extra_args+=(
+                    --dry-run
+                    --verbose
+                )
+                ;;
+            -d | --delete)
+                extra_args+=(
+                    --delete
+                    --delete-excluded
+                )
+                ;;
+            -s | --silent)
+                quiet=1
+                ;;
+            *)
+                tput bold
+                printf '  invalid option: "%s"\n' "${param}"
+                tput sgr0
+                return
+                ;;
+        esac
+    done
+
+    case $cmd in
+        up|run|start)
+            run "${extra_args[@]}"
+            return
+            ;;
+        down)
+            echo '(not implemented)'
+            return
+            ;;
+        help)
+            help
+            return
+            ;;
+        *)
+            tput bold
+            printf '  invalid command: "%s"\n' "${cmd}"
+            tput sgr0
+            return
+            ;;
+
+    esac
+    return
+}
+rsync-my-site() {
+    init
+}
+
+if [[ $0 != "${BASH_SOURCE[0]}" ]]; then
+    export -f rsync-my-site
+else
+    init "${@}"
+    exit $?
+fi
+

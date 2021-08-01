@@ -1,0 +1,29 @@
+{
+    "name": "@quidprobros/rsync-my-site",
+    "description": "bpkg package",
+    "scripts": {
+        "test": "./bin/rsync-my-site run -t",
+        "test-help": "./bin/rsync-my-site help"
+    },
+    "bin": [
+        "./bin/rsync-my-site"
+    ],
+    "author": "Christopher David Ramos",
+    "license": "ISC",
+    "config": {
+        "ssh_alias": "testing_sync_my_site",
+        "ssh_remote_root": "",
+        "ssh_local_root": "./",
+        "rsync_protect_and_perish_list": {
+            "protect": [
+            ],
+            "perish": [
+            ]
+        },
+        "rsync_exclude_list": [
+        ],
+        "rsync_include_list": [
+        ]
+    },
+    "files": []
+}
