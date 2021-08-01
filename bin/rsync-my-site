@@ -304,6 +304,7 @@ run() {
 
     printf 'Select option 1 to start synchronization'
     if elementInArray extra_args '--dry-run'; then printf ' (dry run)'; else printf ' (live)'; fi
+    if elementInArray extra_args '--delete'; then printf ' (delete mode)'; else printf ' (preserve mode)'; fi
     printf ':\n'
     select yn in "continue" "quit"
     do
