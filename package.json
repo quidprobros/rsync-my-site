@@ -13,16 +13,19 @@
     "config": {
         "ssh_alias": "testing_sync_my_site",
         "ssh_remote_root": "",
-        "ssh_local_root": "./",
         "rsync_protect_and_perish_list": {
             "protect": [
+                "der"
             ],
             "perish": [
+                "ok"
             ]
         },
         "rsync_exclude_list": [
+            "a"
         ],
         "rsync_include_list": [
+            "b"
         ]
     },
     "files": []

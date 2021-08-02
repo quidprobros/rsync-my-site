@@ -68,7 +68,7 @@ handlePkgParseResponse() {
             ;;
         3|4)
             warn "Warning(${code}) parsing ${property}"$'\n'
-            warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.\n'
+            warn ' * Property array is empty or doesn'\''t exist. Make sure this is what you want.'
             tput sgr0
             return
             ;;
@@ -89,17 +89,18 @@ handlePkgParseResponse() {
 # test if Internet reachable
 connectionTest() {
     # test if port is open
-    info -v 'Testing SSH connection to remote host ... '
-    if ssh -q "${1}" exit
+    info -v "Testing SSH connection to remote host (${1}) ... "
+
+    if ssh -q -o ConnectTimeout=20 "${1}" exit
     then
         tput bold
-        info -v $'success\n\n'
+        info -v $'success'$'\n'
         tput sgr0
         return
     fi
     tput bold
-    info 'failed.\n'
-    info "  * Could not connect to ${ssh_target}"$'\n'
+    info 'failed'$'\n'
+    info "  Could not connect to ${ssh_target}"$'\n'
     tput sgr0
 
     info -v '  Checking Internet connection ... '
@@ -178,19 +179,25 @@ run() {
     : "${config[ssh_remote_port]:=22}"
 
     # apply default CWD
-    : "${config[ssh_local_root]:=./}"
+    : "${config[ssh_local_root]:="${PWD}/"}"
 
-    if [ -z "${config[ssh_alias]}" ]; then
+    if [ -z "${config[ssh_alias]}" ] && [ -z "${config[ssh_user]}" ]; then
+        printf '\a!! Unable to determine SSH target !!\n'
+        return
+    elif [ -z "${config[ssh_alias]}" ]; then
         declare -r ssh_target="${config[ssh_user]}@${config[ssh_domain]}"
     else
         declare -r ssh_target="${config[ssh_alias]}"
     fi
 
     declare -r ssh_target_full="${ssh_target}:${config[ssh_remote_root]}"
-    connectionTest "${ssh_target}" || return
+    connectionTest "${ssh_target?}" || return
 
-    info 'File source:'$'\n  '"${config[ssh_local_root]}" $'\n\n'
-    info 'Target destination:'$'\n  '"${ssh_target}"$'\n\n'
+    tput smul; info 'File source:'; tput sgr0
+    info "${config[ssh_local_root]}"$'\n'
+
+    tput smul; info 'Target destination:'; tput sgr0
+    info "${ssh_target}" "${config[ssh_alias]:+(alias)}"$'\n'
 
     # base-level exclusions (can extend)
     declare -a exclusions=(
@@ -267,20 +274,21 @@ run() {
     done
     unset key
 
-    info $'\n\n'
-
-    info 'Include list ...\n'
+    tput smul; info 'Include list:'; tput sgr0
     if [[ 0 -eq "${#inclusions[@]}" ]]; then
         info '  !! No files from exclusion list will be uploaded !!\n\n'
     else
-        info "  ${inclusions[*]}"$'\n\n'
+        info -v "${inclusions[@]}"
+        info $'\n'
     fi
 
-    info 'Filtered ...'
-    IFS=$'\n' info "${protection_and_perish[@]}"
+    tput smul; info 'Filtered:'; tput sgr0
+    IFS=$'\n' info -v "${protection_and_perish[@]}"
+    info $'\n'
 
-    info 'Exclusions ...'
-    IFS=$'\n' info "${exclusions[@]}"
+    tput smul; info 'Exclusions:'; tput sgr0
+    IFS=$'\n' info -v "${exclusions[@]}"
+    info $'\n'
 
     tput bold
     tput smul
@@ -306,6 +314,7 @@ run() {
     if elementInArray extra_args '--dry-run'; then printf ' (dry run)'; else printf ' (live)'; fi
     if elementInArray extra_args '--delete'; then printf ' (delete mode)'; else printf ' (preserve mode)'; fi
     printf ':\n'
+    printf '\a'
     select yn in "continue" "quit"
     do
         case $yn in

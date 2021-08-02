@@ -112,6 +112,8 @@ For far greater detail than you'll likely ever need, please consult the man page
 
 
 # tasks
+- [ ] make sure to stop if json is malformed!
+- [ ] warn about empty include list too
 - [ ] command to put website in an 'under construction' mode
 - [ ] do i need to CD into directory before starting rsync?
 - [ ] test running from project root
