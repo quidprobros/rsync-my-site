@@ -90,6 +90,7 @@ Config properties in package.json
         "ssh_local_root": string,
         "ssh_remote_root": string,
         "rsync_exclude_list": [
+            // files to exclude from ssh_local_root
         ],
         "rsync_protect_and_perish_list": {
             "protect": [
@@ -100,6 +101,7 @@ Config properties in package.json
             ]
         },
         "rsync_include_list": [
+            // files to include from rsync_exclude_list
         ]
     }
 }
