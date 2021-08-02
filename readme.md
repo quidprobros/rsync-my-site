@@ -1,6 +1,9 @@
-# rsync-my-site
+# rsync-my-site 
 
-This script helps you to syncronize your local website files to a remote host
+This script helps you to syncronize your local website files to a remote host.
+
+This is beta-ware -- use at your own peril! 
+
 
 ## Usage
 rsync-my-site is designed to be used in an npm project.

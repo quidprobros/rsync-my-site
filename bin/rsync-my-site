@@ -15,7 +15,6 @@ trap 'hangup $?' SIGINT
 
 quiet=0
 quieter=1
-# test for -s to strip newline
 info() { [[ "$quiet" -eq 0 ]] && ([ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*") ; return 0;}
 warn() {  [[ "$quieter" -eq 0 ]] && ([ '-v' = "${1}" ] && (shift; printf %s "$*") || printf %s\\n "$*") ; return 0;}
 
