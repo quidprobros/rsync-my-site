@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-#
-#echo $PWD
-#env
-#exit
+
 err() {
     echo "err(${1}) on line $(caller)" >&2
     exit "${1}"
