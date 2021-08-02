@@ -80,8 +80,8 @@ something/b
 Notice that the include entry overrules the exclude entry.
 
 
-Config properties in package.sjon
-```json
+Config properties in package.json
+```javascript
 {
     "config": {
         "ssh_alias": string,
