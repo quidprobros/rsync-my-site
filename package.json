@@ -22,10 +22,12 @@
             ]
         },
         "rsync_exclude_list": [
-            "a"
+            "a",
+            ".git",
+            "/src/*"
         ],
         "rsync_include_list": [
-            "b"
+            "src/lol"
         ]
     },
     "files": []
